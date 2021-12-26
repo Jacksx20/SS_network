@@ -1,0 +1,376 @@
+
+
+LSW1----------------------------------
+sys
+sysname LSW1
+
+vlan batch 10 20 254 78 7 127
+
+dhcp enable
+
+int Vlanif 7
+ip add 10.1.7.7 24
+
+int Vlanif 78
+ip add 10.1.78.7 24
+
+int Vlanif 127
+ip add 10.1.127.7 24
+q
+
+int Vlanif 254
+ip add 10.1.254.7 24
+dhcp select interface
+dhcp server option 43 sub-option 2 ip-address 10.1.7.10 10.1.8.10
+q
+
+interface eth-trunk 1
+mode lacp-static
+
+lacp preempt enable
+
+lacp preempt delay 10
+
+max active-linknumber 2
+
+trunkport G 0/0/20
+trunkport G 0/0/21
+trunkport G 0/0/22
+
+load-balance src-dst-mac
+
+port link-type trunk
+port trunk allow-pass vlan 10 20 254 78
+quit
+
+lacp priority 100
+
+int g0/0/22
+lacp priority 16384
+
+port-group group-member g0/0/23 eth1
+port link-type trunk
+port trunk allow-pass vlan 10 20 254
+quit
+
+interface G0/0/10
+port link-type access
+port default vlan 7
+
+interface G0/0/11
+port link-type access
+port default vlan 127
+q
+
+stp mode mstp
+stp region-configuration
+region-name MST
+revision-level 1
+instance 1 vlan 10
+instance 2 vlan 20
+active region-configuration
+q
+
+stp instance 1 root primary
+stp instance 2 root secondary
+
+port-group group-member g0/0/23 eth1
+stp loop-protection
+stp edged-port disable
+q
+stp edged-port default
+
+int Vlanif 10
+ip add 10.1.10.7 24
+vrrp vrid 1 virtual-ip 10.1.10.254
+vrrp vrid 1 priority 101
+#启用MD5认证
+vrrp vrid 1 authentication-mode md5 Jack20
+
+int Vlanif 20
+ip add 10.1.20.7 24
+vrrp vrid 2 virtual-ip 10.1.20.254
+q
+
+int Vlanif 10
+ip add 10.1.10.7 24
+vrrp vrid 1 virtual-ip 10.1.10.254
+vrrp vrid 1 priority 101
+vrrp vrid 1 authentication-mode md5 Jack20
+
+int Vlanif 20
+ip add 10.1.20.7 24
+vrrp vrid 2 virtual-ip 10.1.20.254
+q
+
+ip pool user
+network 10.1.10.0 mask 24
+gateway-list 10.1.10.254
+q
+int vlan10
+dhcp select global
+q
+
+ospf 1 
+area 1
+network 10.1.0.0 0.0.255.255
+quit
+silent-interface Vlanif7
+silent-interface Vlanif10
+silent-interface Vlanif20
+quit
+
+int Vlanif 78
+ospf network-type p2p
+
+
+LSW2---------------------------------------------------
+sys
+sysname LSW2
+
+vlan batch 10 20 254 78 8 138
+
+int Vlanif 8
+ip add 10.1.8.8 24
+
+int Vlanif 78
+ip add 10.1.78.8 24
+
+int Vlanif 138
+ip add 10.1.138.8 24
+q
+
+interface G0/0/10
+port link-type access
+port default vlan 8
+
+interface G0/0/11
+port link-type access
+port default vlan 138
+q
+
+interface eth-trunk 1
+mode lacp-static
+
+trunkport G 0/0/20
+trunkport G 0/0/21
+trunkport G 0/0/22
+
+port link-type trunk
+port trunk allow-pass vlan 10 20 254 78
+quit
+
+interface G0/0/24
+port link-type trunk
+port trunk allow-pass vlan 10 20 254
+quit
+
+stp mode mstp
+stp region-configuration
+region-name MST
+revision-level 1
+instance 1 vlan 10
+instance 2 vlan 20
+active region-configuration
+q
+
+stp instance 2 root primary
+stp instance 1 root secondary
+
+port-group group-member g0/0/24 eth1
+stp loop-protection
+stp edged-port disable
+q
+stp edged-port default
+
+int Vlanif 10
+ip add 10.1.10.8 24
+vrrp vrid 1 virtual-ip 10.1.10.254
+vrrp vrid 1 authentication-mode md5 Jack20
+
+int Vlanif 20
+ip add 10.1.20.8 24
+vrrp vrid 2 virtual-ip 10.1.20.254
+vrrp vrid 2 priority 101
+q
+
+ospf 1 
+area 1
+network 10.1.0.0 0.0.255.255
+quit
+silent-interface Vlanif8
+silent-interface Vlanif10
+silent-interface Vlanif20
+quit
+
+int Vlanif 78
+#优化网络类型
+ospf network-type p2p
+
+
+
+LSW3--------------------------------------------------
+sys
+sysname LSW3
+
+vlan batch 10 20 254
+
+interface G0/0/1
+port link-type trunk
+port trunk pvid vlan 254
+port trunk allow-pass vlan 10 254
+
+interface G0/0/10
+port link-type access
+port default vlan 20
+q
+
+port-group group-member g0/0/23 g0/0/24 
+port link-type trunk
+port trunk allow-pass vlan 10 20 254
+quit
+
+stp mode mstp
+stp region-configuration
+region-name MST
+revision-level 1
+instance 1 vlan 10
+instance 2 vlan 20
+active region-configuration
+q
+
+port-group group-member g0/0/23 g0/0/24
+stp loop-protection
+stp edged-port disable
+q
+stp edged-port default
+
+stp bpdu-protection
+
+AC1----------------------------------------------------
+sys
+sysname AC1
+
+vlan 254
+
+int vlan1
+ip add 10.1.7.10 24
+
+ip route-static 0.0.0.0 0 10.1.7.7
+
+capwap source interface VLAN1
+
+wlan
+regulatory-domain-profile name Jack20
+country-code CN 
+quit
+
+ap auth-mode mac-auth
+ap-group name Jack20
+regulatory-domain-profile Jack20
+y
+quit
+
+ap-mac 00e0-fcea-7350
+ap-name ap1
+ap-group Jack20
+y
+
+security-profile name Jack20-Lab
+security wpa-wpa2 psk pass-phrase Jack20-Lab aes
+quit
+
+ssid-profile name Jack20-Lab
+ssid Jack20-Lab
+quit
+
+ap-system-profile name AP_PRO
+primary-access ip-address 10.1.7.10
+backup-access ip-address 10.1.8.10
+q
+q
+
+hsb-service 0
+service-ip-port local-ip 10.1.7.10 peer-ip 10.1.8.10 local-data-port 10240 peer-data-port 10240
+
+wlan
+vap-profile name Jack20-Lab
+forward-mode direct-forward 
+service-vlan vlan-id 10
+security-profile Jack20-Lab
+ssid-profile Jack20-Lab
+quit
+
+ap-group name Jack20
+vap-profile Jack20-Lab wlan 1 radio all 
+ap-system-profile AP_PRO
+y
+quit
+
+ac protect enable
+y
+
+
+AC2------------------------------------------------------------
+sys
+sysname AC2
+
+vlan 254
+
+int vlan1
+ip add 10.1.8.10 24
+
+ip route-static 0.0.0.0 0 10.1.8.8
+
+capwap source interface VLAN1
+
+wlan
+regulatory-domain-profile name Jack20
+country-code CN 
+quit
+
+ap auth-mode mac-auth
+ap-group name Jack20
+regulatory-domain-profile Jack20
+y
+quit
+
+ap-mac 00e0-fcea-7350
+ap-name ap1
+ap-group Jack20
+y
+
+security-profile name Jack20-Lab
+security wpa-wpa2 psk pass-phrase Jack20-Lab aes
+quit
+
+ssid-profile name Jack20-Lab
+ssid Jack20-Lab
+quit
+
+ap-system-profile name AP_PRO
+primary-access ip-address 10.1.7.10
+backup-access ip-address 10.1.8.10
+q
+
+hsb-service 0
+service-ip-port local-ip 10.1.8.10 peer-ip 10.1.7.10 local-data-port 10240 peer-data-port 10240
+q
+
+wlan
+vap-profile name Jack20-Lab
+forward-mode direct-forward 
+service-vlan vlan-id 10
+security-profile Jack20-Lab
+ssid-profile Jack20-Lab
+quit
+
+ap-group name Jack20
+vap-profile Jack20-Lab wlan 1 radio all 
+ap-system-profile AP_PRO
+y
+quit
+q
+
+ac protect enable
+y
